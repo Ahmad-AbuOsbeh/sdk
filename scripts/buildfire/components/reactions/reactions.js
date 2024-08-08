@@ -575,6 +575,8 @@ buildfire.components.reactions = (() => {
     class ReactionsTypes {
         static itemsReactionsGroupName = {};
         static groups = null;
+        static _firstReactionsRequestSent = false;
+        static _reactionsCallbackQueue = [];
 
         static get TAG() {
             return "$$reactionsGroups";
@@ -1003,7 +1005,7 @@ buildfire.components.reactions = (() => {
                 return console.error('Missing selector');
             }
 
-            buildfire.components.reactions.getReactionGroups((error, res) => {
+            const reactionCallBack = (error, res, _executeCallBacks) => {
                 if (error) return console.error(error);
 
                 let options = {
@@ -1017,7 +1019,28 @@ buildfire.components.reactions = (() => {
                     this._init();
                 });
 
-            });
+                if (_executeCallBacks) {
+                    executeCallBacks();
+                }
+
+            };
+
+            const executeCallBacks = () => {
+                ReactionsTypes._reactionsCallbackQueue.forEach(cb => {
+                    cb();
+                })
+                ReactionsTypes._reactionsCallbackQueue = [];
+            };
+
+            //get reactions from db only once
+            if (!ReactionsTypes._firstReactionsRequestSent) {
+                ReactionsTypes._firstReactionsRequestSent = true;
+                buildfire.components.reactions.getReactionGroups((error, res) => {reactionCallBack(error, res, true)});
+            } else if (ReactionsTypes.groups) {
+                reactionCallBack();
+            } else {
+                ReactionsTypes._reactionsCallbackQueue.push(reactionCallBack);
+            }
         }
 
         _init() {
